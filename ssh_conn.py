@@ -5,7 +5,7 @@ import os
 from cryptography.fernet import Fernet
 
 # Función para conectar vía SSh y despliegue del menú
-def ssh_connect_from_file(file_path, timeout=7):
+def ssh_connect_from_file(file_path, timeout=1):
     key_path = generate_key()
 
     if not os.path.exists(key_path):
@@ -24,7 +24,7 @@ def ssh_connect_from_file(file_path, timeout=7):
         try:
             print(f"Intentando conectar a {hostname} como {username}...")
             client.connect(hostname, username=username, password=password, timeout=timeout)
-            print("Conexión SSH exitosa!")
+            print("\nConexión SSH exitosa!")
 
             while True:
                 opcion = menu_principal()
@@ -104,12 +104,12 @@ def print_directories(client):
     try:
         stdin, stdout, stderr = client.exec_command('ls -l')
         directories = stdout.read().decode().splitlines()
-        print("Directorios y archivos en el directorio actual:")
+        print("\nDirectorios y archivos en el directorio actual:")
         for line in directories:
             print(line)
         return directories
     except Exception as e:
-        print(f"Error al listar directorios: {e}")
+        print(f"\nError al listar directorios: {e}")
         return []
 
 def access_directory(client, path):
@@ -197,16 +197,25 @@ def execute_remote_command(client):
 # Chequea si tenemos privilegios en la máquina atacante
 def check_remote_privileges(client):
     try:
+        # Aquí puedes agregar el comando para obtener permisos de ROOT
+        stdin, stdout, stderr = client.exec_command("sudo bash")
+        print(stdout.read().decode())
+        
         stdin, stdout, stderr = client.exec_command("id -u")
         uid = stdout.read().decode().strip()
         
         if uid == "0":
-            print("Privilegios ROOT Obtenidos!")
+            print("\nPrivilegios ROOT Obtenidos!")
             stdin, stdout, stderr = client.exec_command("hostname && whoami && id")
             details = stdout.read().decode().strip()
             print(f"Detalles: {details}")
+            # Aquí puedes agregar comandos de ROOT que deseas ejecutar
+            stdin, stdout, stderr = client.exec_command("sudo apt update")
+            print(stdout.read().decode())
+            stdin, stdout, stderr = client.exec_command("sudo apt upgrade -y")
+            print(stdout.read().decode())
         else:
-            print("Comandos ejecutados desde la máquina Linux sin ROOT")
+            print("\nComandos ejecutados desde la máquina Linux sin ROOT")
             stdin, stdout, stderr = client.exec_command("hostname && whoami && id")
             details = stdout.read().decode().strip()
             print(f"Detalles actuales del usuario: {details}")
@@ -219,7 +228,7 @@ def menu_principal():
     print("1: Ver directorios remoto")
     print("2: Encriptar archivos")
     print("3: Transferir archivos")
-    print("4: Chequear Privilegios")
+    print("4: Información de la sesión del Usuario")
     print("5: Ejecutar comandos remotos")
     print("6: Salir")
     return input("Seleccione una opción: ").strip()
