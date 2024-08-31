@@ -1,5 +1,6 @@
 from cryptography.fernet import Fernet
 import os
+import sys
 
 def cargar_key():
     try:
@@ -25,7 +26,20 @@ def decrypt(items, key):
             print(f"Error al desencriptar {item}: {str(e)}")
 
 if __name__ == '__main__':
-    path_to_decrypt = '/home/kali/Desktop/prueba/'
+    if len(sys.argv) < 2:
+        print("Error: Se requiere la ruta del directorio a desencriptar.")
+        sys.exit(1)
+
+    path_to_decrypt = sys.argv[1]
+
+    if not os.path.exists(path_to_decrypt):
+        print("La ruta especificada no existe.")
+        sys.exit(1)
+
+    if not os.path.isdir(path_to_decrypt):
+        print("La ruta especificada no es un directorio.")
+        sys.exit(1)
+
     items = os.listdir(path_to_decrypt)
     full_path = [os.path.join(path_to_decrypt, item) for item in items if os.path.isfile(os.path.join(path_to_decrypt, item)) and item != 'readme.txt']
 

