@@ -1,5 +1,5 @@
 dependences:
-pip install paramiko cryptography
+pip install paramiko
 execute:
 python ssh_conn.py
 
